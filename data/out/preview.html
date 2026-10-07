@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>米子市 小地域 プレビュー</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  html, body, #map { margin: 0; height: 100%; }
+  body { font: 13px/1.5 system-ui, sans-serif; }
+  #panel {
+    position: absolute; top: 10px; left: 10px; z-index: 1;
+    background: #fff; padding: 8px 12px; border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  }
+  #panel label { display: block; }
+  #info { margin-top: 6px; color: #444; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <label>簡略化 <select id="level"></select></label>
+  <label><input type="checkbox" id="full"> 簡略化なしの境界を重ねる（赤）</label>
+  <label><input type="checkbox" id="labels" checked> 名前を表示</label>
+  <div id="info">区域をクリックすると属性を表示</div>
+</div>
+<div id="map"></div>
+<script>
+// data/out をルートにした HTTP サーバーから開く（npm run preview）。file:// では GeoJSON を読めない
+const variantUrl = (level) => `variants/shochiiki_${level}.geojson`;
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources: {
+      pale: {
+        type: 'raster',
+        tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        maxzoom: 18,
+        attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">地理院タイル</a>',
+      },
+    },
+    layers: [{ id: 'pale', type: 'raster', source: 'pale' }],
+  },
+  bounds: [[133.227, 35.374], [133.481, 35.501]],
+  fitBoundsOptions: { padding: 20 },
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+
+map.on('load', async () => {
+  const { default: def, levels } = await (await fetch('variants/levels.json')).json();
+  const select = document.getElementById('level');
+  for (const l of levels) select.add(new Option(l === 'full' ? 'なし (full)' : `${l}%`, l, l === def, l === def));
+
+  map.addSource('areas', { type: 'geojson', data: variantUrl(def) });
+  map.addSource('full', { type: 'geojson', data: variantUrl('full') });
+
+  map.addLayer({ id: 'fill', type: 'fill', source: 'areas',
+    paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.12 } });
+  map.addLayer({ id: 'full-line', type: 'line', source: 'full',
+    layout: { visibility: 'none' },
+    paint: { 'line-color': '#dc2626', 'line-width': 1 } });
+  map.addLayer({ id: 'line', type: 'line', source: 'areas',
+    paint: { 'line-color': '#1e3a8a', 'line-width': 1.2 } });
+  map.addLayer({ id: 'label', type: 'symbol', source: 'areas',
+    layout: { 'text-field': ['get', 'name'], 'text-font': ['Open Sans Regular'], 'text-size': 11 },
+    paint: { 'text-color': '#111', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } });
+
+  select.addEventListener('change', () => map.getSource('areas').setData(variantUrl(select.value)));
+  document.getElementById('full').addEventListener('change', (e) =>
+    map.setLayoutProperty('full-line', 'visibility', e.target.checked ? 'visible' : 'none'));
+  document.getElementById('labels').addEventListener('change', (e) =>
+    map.setLayoutProperty('label', 'visibility', e.target.checked ? 'visible' : 'none'));
+
+  const info = document.getElementById('info');
+  map.on('click', 'fill', (e) => {
+    const p = e.features[0].properties;
+    info.textContent = `${p.name}　code: ${p.code}　kihon1: ${p.kihon1}`;
+  });
+  map.on('mouseenter', 'fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'fill', () => { map.getCanvas().style.cursor = ''; });
+});
+</script>
+</body>
+</html>

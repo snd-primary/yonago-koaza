@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+# e-Stat からダウンロードしたままのフォルダ（入力は data/raw/ にコピー済み）
+/A002005212020DDSWC31202/
+/B002005212020DDSWC31202/

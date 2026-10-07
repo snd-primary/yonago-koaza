@@ -1,0 +1,2 @@
+mapshaper(shift_jis) と GDAL(LDID) の読みは全件一致
+置換文字(U+FFFD)を含む行: 0

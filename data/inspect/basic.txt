@@ -1,0 +1,46 @@
+## prj
+GEOGCS["GCS_JGD_2000",DATUM["D_JGD_2000",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]
+
+## cpg
+(なし)
+## dbf LDID (byte 29)
+13
+## ogrinfo
+INFO: Open of `data/raw/r2ka31202.shp'
+      using driver `ESRI Shapefile' successful.
+
+Layer name: r2ka31202
+Metadata:
+  DBF_DATE_LAST_UPDATE=1926-10-07
+Geometry: Polygon
+Feature Count: 259
+Extent: (133.227005, 35.374155) - (133.480558, 35.501165)
+KEY_CODE: String (11.0)
+PREF: String (2.0)
+CITY: String (3.0)
+S_AREA: String (6.0)
+PREF_NAME: String (12.0)
+CITY_NAME: String (16.0)
+S_NAME: String (96.0)
+KIGO_E: String (3.0)
+HCODE: Integer (4.0)
+AREA: Real (15.3)
+PERIMETER: Real (15.3)
+R2KAxx: Integer (6.0)
+R2KAxx_ID: Integer (6.0)
+KIHON1: String (4.0)
+DUMMY1: String (1.0)
+KIHON2: String (2.0)
+KEYCODE1: String (9.0)
+KEYCODE2: String (9.0)
+AREA_MAX_F: String (1.0)
+KIGO_D: String (2.0)
+N_KEN: String (2.0)
+N_CITY: String (3.0)
+KIGO_I: String (1.0)
+KBSUM: Integer (4.0)
+JINKO: Integer64 (10.0)
+SETAI: Integer64 (10.0)
+X_CODE: Real (15.6)
+Y_CODE: Real (15.6)
+KCODE1: String (7.0)

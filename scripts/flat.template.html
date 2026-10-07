@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>米子市 小地域 境界図</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --text: #1f2328; --muted: #6a6f76; --border: #d9d7d0;
+    --line: #3b3f45; --line-group: #111317; --outline: #000000; --hover: #e8590c; --label-halo: #ffffff;
+    --c0: #cfe3f5; --c1: #f7dcc0; --c2: #d4ecd0; --c3: #e8d5f0; --c4: #f6f0bf; --c5: #f3cfd6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16181b; --panel: #202328; --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3e44;
+      --line: #c9ccd1; --line-group: #f2f3f5; --outline: #ffffff; --hover: #ff922b; --label-halo: #16181b;
+      --c0: #24435e; --c1: #5a4128; --c2: #2e4d31; --c3: #4a3558; --c4: #55502a; --c5: #5b2f39;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16181b; --panel: #202328; --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3e44;
+    --line: #c9ccd1; --line-group: #f2f3f5; --outline: #ffffff; --hover: #ff922b; --label-halo: #16181b;
+    --c0: #24435e; --c1: #5a4128; --c2: #2e4d31; --c3: #4a3558; --c4: #55502a; --c5: #5b2f39;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.5 system-ui, -apple-system, "Hiragino Sans", sans-serif; overflow: hidden; }
+  svg { display: block; width: 100%; height: 100%; cursor: grab; }
+  svg:active { cursor: grabbing; }
+  #panel {
+    position: absolute; top: 12px; left: 12px; width: min(280px, calc(100vw - 32px));
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  #panel h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  #panel select, #panel input[type=search] {
+    font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+  }
+  #panel input[type=search] { width: 100%; }
+  #info { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); color: var(--muted); min-height: 3em; }
+  #info b { color: var(--text); font-size: 15px; }
+  .legend { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; color: var(--muted); font-size: 12px; }
+  .legend span { display: inline-block; width: 22px; vertical-align: middle; margin-right: 6px; border-top-style: solid; border-color: var(--line); }
+  .area { stroke: none; }
+  .area.hover { fill: var(--hover) !important; fill-opacity: .55; }
+  .mesh-all { fill: none; stroke: var(--line); stroke-linejoin: round; }
+  .mesh-group { fill: none; stroke: var(--line-group); stroke-linejoin: round; }
+  .mesh-outline { fill: none; stroke: var(--outline); stroke-linejoin: round; }
+  .label { fill: var(--text); paint-order: stroke; stroke: var(--label-halo); stroke-linejoin: round; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  #matches { list-style: none; margin: 4px 0 0; padding: 0; max-height: 140px; overflow: auto; }
+  #matches li { padding: 2px 4px; cursor: pointer; border-radius: 3px; }
+  #matches li:hover { background: var(--bg); }
+</style>
+</head>
+<body>
+<svg id="map"></svg>
+<div id="panel">
+  <h1>米子市 小地域 境界図</h1>
+  <div class="row">塗り分け
+    <select id="mode">
+      <option value="area">区域ごと（隣と違う色）</option>
+      <option value="group">町字コード（kihon1）ごと</option>
+      <option value="none">塗らない（線だけ）</option>
+    </select>
+  </div>
+  <div class="row"><label><input type="checkbox" id="labels" checked> 名前を表示</label></div>
+  <div class="row"><input type="search" id="search" placeholder="名前で探す（例：皆生）"></div>
+  <ul id="matches"></ul>
+  <div class="legend">
+    <div><span style="border-top-width:1px"></span>区域の境界</div>
+    <div><span style="border-top-width:2.5px;border-color:var(--line-group)"></span>町字コード（kihon1）の境界</div>
+    <div><span style="border-top-width:4px;border-color:var(--outline)"></span>市の外周</div>
+  </div>
+  <div id="info">区域にマウスを乗せると属性を表示</div>
+</div>
+<script>
+const topo = /*__TOPOJSON__*/null;
+
+const object = topo.objects[Object.keys(topo.objects)[0]];
+const features = topojson.feature(topo, object).features;
+const geoms = object.geometries;
+const PALETTE = 6;
+
+// 隣接する区域（または町字コードのグループ）が同じ色にならないよう、貪欲法で色番号を振る
+const neighbors = topojson.neighbors(geoms);
+function greedyColor(keyOf) {
+  const keys = [...new Set(features.map(keyOf))];
+  const adj = new Map(keys.map(k => [k, new Set()]));
+  neighbors.forEach((ns, i) => ns.forEach(j => {
+    const a = keyOf(features[i]), b = keyOf(features[j]);
+    if (a !== b) { adj.get(a).add(b); adj.get(b).add(a); }
+  }));
+  keys.sort((a, b) => adj.get(b).size - adj.get(a).size);
+  const color = new Map();
+  for (const k of keys) {
+    const used = new Set([...adj.get(k)].map(n => color.get(n)));
+    let c = 0; while (used.has(c)) c++;
+    color.set(k, c % PALETTE);
+  }
+  return color;
+}
+const areaKey = f => f.properties.code + '|' + features.indexOf(f);
+const groupKey = f => f.properties.kihon1;
+const areaColor = greedyColor(areaKey);
+const groupColor = greedyColor(groupKey);
+
+const svg = d3.select('#map');
+const root = svg.append('g');
+const projection = d3.geoMercator();
+const path = d3.geoPath(projection);
+
+function fit() {
+  const { width, height } = svg.node().getBoundingClientRect();
+  const pad = Math.min(width, height) * 0.04;
+  projection.fitExtent([[pad + (width > 700 ? 300 : 0), pad], [width - pad, height - pad]], topojson.feature(topo, object));
+}
+fit();
+
+const areas = root.append('g').selectAll('path').data(features).join('path').attr('class', 'area');
+const meshAll = root.append('path').attr('class', 'mesh-all')
+  .datum(topojson.mesh(topo, object, (a, b) => a !== b));
+const meshGroup = root.append('path').attr('class', 'mesh-group')
+  .datum(topojson.mesh(topo, object, (a, b) => a !== b && a.properties.kihon1 !== b.properties.kihon1));
+const meshOutline = root.append('path').attr('class', 'mesh-outline')
+  .datum(topojson.mesh(topo, object, (a, b) => a === b));
+const labels = root.append('g').selectAll('text').data(features).join('text').attr('class', 'label')
+  .text(d => d.properties.name);
+
+function draw() {
+  areas.attr('d', path);
+  meshAll.attr('d', path); meshGroup.attr('d', path); meshOutline.attr('d', path);
+  labels.each(function (d) {
+    d._c = path.centroid(d);
+    d._a = path.area(d);
+  }).attr('x', d => d._c[0]).attr('y', d => d._c[1]);
+}
+
+function applyMode() {
+  const mode = document.getElementById('mode').value;
+  areas.style('fill', f => mode === 'none' ? 'transparent'
+    : `var(--c${(mode === 'group' ? groupColor.get(groupKey(f)) : areaColor.get(areaKey(f)))})`);
+}
+
+let k = 1;
+function restyle() {
+  // ズームしても線と文字の画面上の太さ・大きさが一定になるよう、倍率で割る
+  meshAll.style('stroke-width', 0.8 / k);
+  meshGroup.style('stroke-width', 2.2 / k);
+  meshOutline.style('stroke-width', 3.5 / k);
+  const show = document.getElementById('labels').checked;
+  labels.style('font-size', `${11 / k}px`).style('stroke-width', 3 / k)
+    // 画面上で十分な広さがある区域だけ名前を出す
+    .style('display', d => show && d._a * k * k > (d.properties.name.length * 11) ** 2 * 0.35 ? null : 'none');
+}
+
+const zoom = d3.zoom().scaleExtent([0.5, 40]).on('zoom', (e) => {
+  k = e.transform.k;
+  root.attr('transform', e.transform);
+  restyle();
+});
+svg.call(zoom);
+
+const info = document.getElementById('info');
+areas.on('mouseenter', function (e, d) {
+  d3.select(this).classed('hover', true).raise();
+  const p = d.properties;
+  info.innerHTML = `<b>${p.name}</b><br>code: ${p.code}<br>kihon1: ${p.kihon1}`;
+}).on('mouseleave', function () {
+  d3.select(this).classed('hover', false);
+});
+
+function zoomTo(f) {
+  const { width, height } = svg.node().getBoundingClientRect();
+  const [[x0, y0], [x1, y1]] = path.bounds(f);
+  const s = Math.min(40, 0.6 / Math.max((x1 - x0) / width, (y1 - y0) / height));
+  svg.call(zoom.transform,
+    d3.zoomIdentity.translate(width / 2, height / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
+  const p = f.properties;
+  info.innerHTML = `<b>${p.name}</b><br>code: ${p.code}<br>kihon1: ${p.kihon1}`;
+  areas.classed('hover', d => d === f);
+}
+
+const matches = document.getElementById('matches');
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.trim();
+  matches.innerHTML = '';
+  if (!q) { areas.classed('hover', false); return; }
+  features.filter(f => f.properties.name.includes(q)).slice(0, 30).forEach(f => {
+    const li = document.createElement('li');
+    li.textContent = f.properties.name;
+    li.onclick = () => zoomTo(f);
+    matches.append(li);
+  });
+});
+
+document.getElementById('mode').addEventListener('change', applyMode);
+document.getElementById('labels').addEventListener('change', restyle);
+window.addEventListener('resize', () => { fit(); draw(); restyle(); });
+
+draw(); applyMode(); restyle();
+</script>
+</body>
+</html>
