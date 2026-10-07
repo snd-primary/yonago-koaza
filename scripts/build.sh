@@ -33,12 +33,24 @@ cp "$OUT/variants/shochiiki_${DEFAULT_LEVEL%\%}.geojson" "$OUT/shochiiki.geojson
 printf '%s\n' "${LEVELS[@]%\%}" | python3 -c 'import json,sys; print(json.dumps({"default": sys.argv[1], "levels": sys.stdin.read().split()}))' \
   "${DEFAULT_LEVEL%\%}" > "$OUT/variants/levels.json"
 
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# 主要道路：data/osm/roads.osm（npm run fetch-roads で取得済み）を市域で切り抜く。ネットワークは使わない
+# データ © OpenStreetMap contributors, ODbL 1.0
+ogr2ogr -f GeoJSON "$TMP/roads_raw.geojson" data/osm/roads.osm -dialect sqlite \
+  -sql "SELECT highway, name, hstore_get_value(other_tags, 'ref') AS ref, GEOMETRY FROM lines WHERE highway IS NOT NULL"
+npx mapshaper -i "$TMP/roads_raw.geojson" \
+  -clip "$OUT/variants/shochiiki_full.geojson" \
+  -simplify interval=3m \
+  -filter-fields highway,name,ref \
+  -o "$OUT/roads.geojson" format=geojson precision=0.000001 force
+
 # flat.html：背景地図なしの境界図。TopoJSON を埋め込むので file:// でそのまま開ける
 # （mapshaper の標準出力は 64KB で切れるので、一時ファイルを経由する）
-TOPO=$(mktemp -d)/shochiiki.topojson
-npx mapshaper -i "$OUT/shochiiki.geojson" -o "$TOPO" format=topojson quantization=1000000
+npx mapshaper -i "$OUT/shochiiki.geojson" "$OUT/roads.geojson" combine-files \
+  -o "$TMP/flat.topojson" format=topojson quantization=1000000
 python3 -c 'import sys; t=open(sys.argv[1]).read(); sys.stdout.write(t.replace("/*__TOPOJSON__*/null", open(sys.argv[2]).read().strip()))' \
-  scripts/flat.template.html "$TOPO" > "$OUT/flat.html"
-rm -rf "$(dirname "$TOPO")"
+  scripts/flat.template.html "$TMP/flat.topojson" > "$OUT/flat.html"
 
 echo "built: $OUT/shochiiki.geojson (simplify $DEFAULT_LEVEL)"

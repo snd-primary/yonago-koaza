@@ -1,0 +1,7 @@
+{
+  "source": "OpenStreetMap via Overpass API (https://overpass-api.de/api/interpreter)",
+  "license": "ODbL 1.0 — © OpenStreetMap contributors",
+  "fetched_at": "2026-10-07T14:32:33Z",
+  "bbox_lat_lon": "35.36,133.21,35.52,133.50",
+  "highway": "^(motorway|trunk|primary|secondary)(_link)?$"
+}

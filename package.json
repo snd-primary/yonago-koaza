@@ -8,7 +8,8 @@
     "inspect": "bash scripts/inspect.sh",
     "build": "bash scripts/build.sh",
     "validate": "bash scripts/validate.sh",
-    "preview": "python3 -m http.server 8765 -d data/out"
+    "preview": "python3 -m http.server 8765 -d data/out",
+    "fetch-roads": "bash scripts/fetch-roads.sh"
   },
   "keywords": [],
   "author": "",

@@ -11,15 +11,18 @@
     --bg: #f6f5f1; --panel: #ffffff; --text: #1f2328; --muted: #6a6f76; --border: #d9d7d0;
     --line: #3b3f45; --line-group: #111317; --outline: #000000; --hover: #e8590c; --label-halo: #ffffff;
     --c0: #cfe3f5; --c1: #f7dcc0; --c2: #d4ecd0; --c3: #e8d5f0; --c4: #f6f0bf; --c5: #f3cfd6;
+    --r-motorway: #c2255c; --r-trunk: #d9480f; --r-primary: #e67700; --r-secondary: #5c940d;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+      --r-motorway: #f06595; --r-trunk: #ff8a3d; --r-primary: #ffc145; --r-secondary: #a9e34b;
       --bg: #16181b; --panel: #202328; --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3e44;
       --line: #c9ccd1; --line-group: #f2f3f5; --outline: #ffffff; --hover: #ff922b; --label-halo: #16181b;
       --c0: #24435e; --c1: #5a4128; --c2: #2e4d31; --c3: #4a3558; --c4: #55502a; --c5: #5b2f39;
     }
   }
   :root[data-theme="dark"] {
+      --r-motorway: #f06595; --r-trunk: #ff8a3d; --r-primary: #ffc145; --r-secondary: #a9e34b;
     --bg: #16181b; --panel: #202328; --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3e44;
     --line: #c9ccd1; --line-group: #f2f3f5; --outline: #ffffff; --hover: #ff922b; --label-halo: #16181b;
     --c0: #24435e; --c1: #5a4128; --c2: #2e4d31; --c3: #4a3558; --c4: #55502a; --c5: #5b2f39;
@@ -49,6 +52,13 @@
   .mesh-all { fill: none; stroke: var(--line); stroke-linejoin: round; }
   .mesh-group { fill: none; stroke: var(--line-group); stroke-linejoin: round; }
   .mesh-outline { fill: none; stroke: var(--outline); stroke-linejoin: round; }
+  .road { fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .road.motorway { stroke: var(--r-motorway); }
+  .road.trunk { stroke: var(--r-trunk); }
+  .road.primary { stroke: var(--r-primary); }
+  .road.secondary { stroke: var(--r-secondary); }
+  #attribution { position: absolute; right: 8px; bottom: 6px; font-size: 11px; color: var(--muted); background: var(--panel); padding: 1px 6px; border-radius: 4px; opacity: .9; }
+  #attribution a { color: inherit; }
   .label { fill: var(--text); paint-order: stroke; stroke: var(--label-halo); stroke-linejoin: round; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
   #matches { list-style: none; margin: 4px 0 0; padding: 0; max-height: 140px; overflow: auto; }
   #matches li { padding: 2px 4px; cursor: pointer; border-radius: 3px; }
@@ -67,19 +77,25 @@
     </select>
   </div>
   <div class="row"><label><input type="checkbox" id="labels" checked> 名前を表示</label></div>
+  <div class="row"><label><input type="checkbox" id="roads" checked> 主要道路を表示</label></div>
   <div class="row"><input type="search" id="search" placeholder="名前で探す（例：皆生）"></div>
   <ul id="matches"></ul>
   <div class="legend">
     <div><span style="border-top-width:1px"></span>区域の境界</div>
     <div><span style="border-top-width:2.5px;border-color:var(--line-group)"></span>町字コード（kihon1）の境界</div>
     <div><span style="border-top-width:4px;border-color:var(--outline)"></span>市の外周</div>
+    <div class="road-legend"><span style="border-top-width:3px;border-color:var(--r-motorway)"></span>高速道路</div>
+    <div class="road-legend"><span style="border-top-width:3px;border-color:var(--r-trunk)"></span>国道</div>
+    <div class="road-legend"><span style="border-top-width:3px;border-color:var(--r-primary)"></span>主要地方道</div>
+    <div class="road-legend"><span style="border-top-width:2px;border-color:var(--r-secondary)"></span>一般県道など</div>
   </div>
   <div id="info">区域にマウスを乗せると属性を表示</div>
 </div>
+<div id="attribution">道路：© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）／境界：e-Stat 令和2年国勢調査 小地域</div>
 <script>
 const topo = /*__TOPOJSON__*/null;
 
-const object = topo.objects[Object.keys(topo.objects)[0]];
+const object = topo.objects.shochiiki;
 const features = topojson.feature(topo, object).features;
 const geoms = object.geometries;
 const PALETTE = 6;
@@ -126,12 +142,23 @@ const meshGroup = root.append('path').attr('class', 'mesh-group')
   .datum(topojson.mesh(topo, object, (a, b) => a !== b && a.properties.kihon1 !== b.properties.kihon1));
 const meshOutline = root.append('path').attr('class', 'mesh-outline')
   .datum(topojson.mesh(topo, object, (a, b) => a === b));
+// 道路（OSM highway）：_link は本線と同じ種別として細めに描く。下位の種別から順に重ねる
+const ROAD_RANK = ['secondary', 'primary', 'trunk', 'motorway'];
+const ROAD_WIDTH = { motorway: 3, trunk: 2.6, primary: 2.2, secondary: 1.6 };
+const roadClass = d => d.properties.highway.replace(/_link$/, '');
+const roadFeatures = topojson.feature(topo, topo.objects.roads).features
+  .filter(d => ROAD_RANK.includes(roadClass(d)))
+  .sort((a, b) => ROAD_RANK.indexOf(roadClass(a)) - ROAD_RANK.indexOf(roadClass(b)));
+const roadsLayer = root.insert('g', '.mesh-all');  // 境界線より下に描く
+const roads = roadsLayer.selectAll('path').data(roadFeatures).join('path')
+  .attr('class', d => `road ${roadClass(d)}`);
 const labels = root.append('g').selectAll('text').data(features).join('text').attr('class', 'label')
   .text(d => d.properties.name);
 
 function draw() {
   areas.attr('d', path);
   meshAll.attr('d', path); meshGroup.attr('d', path); meshOutline.attr('d', path);
+  roads.attr('d', path);
   labels.each(function (d) {
     d._c = path.centroid(d);
     d._a = path.area(d);
@@ -150,6 +177,10 @@ function restyle() {
   meshAll.style('stroke-width', 0.8 / k);
   meshGroup.style('stroke-width', 2.2 / k);
   meshOutline.style('stroke-width', 3.5 / k);
+  roads.style('stroke-width', d => ROAD_WIDTH[roadClass(d)] * (d.properties.highway.endsWith('_link') ? 0.6 : 1) / k);
+  const showRoads = document.getElementById('roads').checked;
+  roadsLayer.style('display', showRoads ? null : 'none');
+  document.querySelectorAll('.road-legend').forEach(el => { el.style.display = showRoads ? '' : 'none'; });
   const show = document.getElementById('labels').checked;
   labels.style('font-size', `${11 / k}px`).style('stroke-width', 3 / k)
     // 画面上で十分な広さがある区域だけ名前を出す
@@ -198,6 +229,7 @@ document.getElementById('search').addEventListener('input', (e) => {
 
 document.getElementById('mode').addEventListener('change', applyMode);
 document.getElementById('labels').addEventListener('change', restyle);
+document.getElementById('roads').addEventListener('change', restyle);
 window.addEventListener('resize', () => { fit(); draw(); restyle(); });
 
 draw(); applyMode(); restyle();

@@ -14,6 +14,9 @@
 - `data/raw/` に e-Stat からダウンロードした Shapefile 一式（.shp / .shx / .dbf / .prj など）を置いてある
 - `data/raw/` 内のファイルは **一切変更しないこと**
 - ネットワークからデータを取ってこないこと（入力は上記のファイルのみ）
+  - **例外：道路データ**。flat.html に重ねる主要道路だけは、OpenStreetMap（Overpass API）から取得してよい
+  - 取得は `npm run fetch-roads` だけで行い、取得結果は `data/osm/` に保存してコミットする。変換（`npm run build`）は保存済みのファイルだけを使い、ネットワークにはアクセスしない
+  - OSM のデータを使う画面には「© OpenStreetMap contributors」（ODbL）を表示すること
 
 ## ツール
 
@@ -88,4 +91,4 @@ data/
 - アプリ本体の実装
 - 小字や地番（筆）の扱い
 - `data/raw/` の変更
-- 私の確認なしに dissolve や除外の判断をすることå
+- 私の確認なしに dissolve や除外の判断をすること
